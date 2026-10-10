@@ -1,0 +1,185 @@
+{
+  "info": { "name": "Restaurant App API", "version": "1.0.0" },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\": \"John\", \"email\": \"john@example.com\", \"password\": \"password123\", \"role\": \"customer\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\": \"customer@example.com\", \"password\": \"password123\"}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "Get All Menu",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/menu", "host": ["{{base_url}}"], "path": ["api", "menu"] }
+          }
+        },
+        {
+          "name": "Get Menu by Category",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/menu?category=Mains", "host": ["{{base_url}}"], "path": ["api", "menu"], "query": [{ "key": "category", "value": "Mains" }] }
+          }
+        },
+        {
+          "name": "Search Menu",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/menu?search=salmon", "host": ["{{base_url}}"], "path": ["api", "menu"], "query": [{ "key": "search", "value": "salmon" }] }
+          }
+        },
+        {
+          "name": "Get Single Menu Item",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/menu/{{menu_item_id}}", "host": ["{{base_url}}"], "path": ["api", "menu", "{{menu_item_id}}"] }
+          }
+        },
+        {
+          "name": "Create Menu Item (Manager)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"name\": \"New Dish\", \"price\": 19.99, \"category\": \"Mains\"}" },
+            "url": { "raw": "{{base_url}}/api/menu", "host": ["{{base_url}}"], "path": ["api", "menu"] }
+          }
+        },
+        {
+          "name": "Update Menu Item (Manager)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"price\": 24.99}" },
+            "url": { "raw": "{{base_url}}/api/menu/{{menu_item_id}}", "host": ["{{base_url}}"], "path": ["api", "menu", "{{menu_item_id}}"] }
+          }
+        },
+        {
+          "name": "Delete Menu Item (Manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/api/menu/{{menu_item_id}}", "host": ["{{base_url}}"], "path": ["api", "menu", "{{menu_item_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"items\": [{\"menuItemId\": \"{{menu_item_id}}\", \"quantity\": 2}], \"specialRequests\": \"No onions\"}" },
+            "url": { "raw": "{{base_url}}/api/orders", "host": ["{{base_url}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "Get My Orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/api/orders/my", "host": ["{{base_url}}"], "path": ["api", "orders", "my"] }
+          }
+        },
+        {
+          "name": "Get All Orders (Manager)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/api/orders", "host": ["{{base_url}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "Update Order Status (Manager)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"status\": \"Preparing\"}" },
+            "url": { "raw": "{{base_url}}/api/orders/{{order_id}}/status", "host": ["{{base_url}}"], "path": ["api", "orders", "{{order_id}}", "status"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"tableId\": \"{{table_id}}\", \"date\": \"2024-12-25\", \"time\": \"19:00\", \"guestCount\": 4}" },
+            "url": { "raw": "{{base_url}}/api/reservations", "host": ["{{base_url}}"], "path": ["api", "reservations"] }
+          }
+        },
+        {
+          "name": "Get My Reservations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/api/reservations/my", "host": ["{{base_url}}"], "path": ["api", "reservations", "my"] }
+          }
+        },
+        {
+          "name": "Get All Reservations (Manager)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "url": { "raw": "{{base_url}}/api/reservations", "host": ["{{base_url}}"], "path": ["api", "reservations"] }
+          }
+        },
+        {
+          "name": "Confirm Reservation (Manager)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{auth_token}}" }],
+            "body": { "mode": "raw", "raw": "{\"status\": \"Confirmed\"}" },
+            "url": { "raw": "{{base_url}}/api/reservations/{{reservation_id}}", "host": ["{{base_url}}"], "path": ["api", "reservations", "{{reservation_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/health", "host": ["{{base_url}}"], "path": ["api", "health"] }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "auth_token", "value": "" },
+    { "key": "menu_item_id", "value": "" },
+    { "key": "order_id", "value": "" },
+    { "key": "reservation_id", "value": "" },
+    { "key": "table_id", "value": "" }
+  ]
+}

@@ -12,11 +12,14 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import users from "../data/users";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { apiRequest } from "../config/api";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
@@ -24,7 +27,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"customer" | "manager">("customer");
-
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +47,7 @@ export default function LoginScreen() {
 
     if (!email.trim()) {
       newErrors.email = "Email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       newErrors.email = "Enter a valid email.";
     }
 
@@ -65,67 +67,45 @@ export default function LoginScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) {
+      return;
+    }
+
+    if (mode === "signup") {
+      Alert.alert(
+        "Signup Not Available",
+        "Backend signup is not available yet. Please use one of the existing demo accounts to log in.",
+      );
       return;
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      if (mode === "login") {
-        const user = users.find(
-          (item) =>
-            item.email.toLowerCase() === email.trim().toLowerCase() &&
-            item.password === password,
-        );
+    try {
+      const data = await apiRequest("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
 
-        setIsSubmitting(false);
+      login(data.user, data.token);
 
-        if (!user) {
-          Alert.alert("Login Failed", "Incorrect email or password.");
-          return;
-        }
-
-        // Store logged-in user in AuthContext
-        login(user);
-
-        if (user.role === "manager") {
-          router.replace("/manager");
-        } else {
-          router.replace("/home");
-        }
-
-        return;
+      if (data.user.role === "manager") {
+        router.replace("/manager");
+      } else {
+        router.replace("/home");
       }
-
-      const existingUser = users.find(
-        (item) => item.email.toLowerCase() === email.trim().toLowerCase(),
-      );
-
-      setIsSubmitting(false);
-
-      if (existingUser) {
-        Alert.alert(
-          "Signup Failed",
-          "An account with this email already exists.",
-        );
-        return;
-      }
-
+    } catch (error: any) {
       Alert.alert(
-        "Signup Successful",
-        "Your mock account has been created. You can now log in.",
+        "Login Failed",
+        error?.message || "Unable to connect to the server.",
       );
-
-      setMode("login");
-      setFullName("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-      setRole("customer");
-      setErrors({});
-    }, 1000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -194,6 +174,7 @@ export default function LoginScreen() {
               <TextInput
                 style={[styles.input, errors.fullName && styles.errorInput]}
                 placeholder="Enter your full name"
+                placeholderTextColor={colors.secondaryText}
                 value={fullName}
                 onChangeText={(text) => {
                   setFullName(text);
@@ -212,8 +193,10 @@ export default function LoginScreen() {
           <TextInput
             style={[styles.input, errors.email && styles.errorInput]}
             placeholder="Enter your email"
+            placeholderTextColor={colors.secondaryText}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
             value={email}
             onChangeText={(text) => {
               setEmail(text);
@@ -236,6 +219,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.passwordInput}
               placeholder="Enter your password"
+              placeholderTextColor={colors.secondaryText}
               secureTextEntry={!showPassword}
               value={password}
               onChangeText={(text) => {
@@ -265,6 +249,7 @@ export default function LoginScreen() {
                   errors.confirmPassword && styles.errorInput,
                 ]}
                 placeholder="Confirm your password"
+                placeholderTextColor={colors.secondaryText}
                 secureTextEntry={!showPassword}
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -323,7 +308,7 @@ export default function LoginScreen() {
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.card} />
             ) : (
               <Text style={styles.submitText}>
                 {mode === "login" ? "Login" : "Create Account"}
@@ -346,186 +331,191 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff7ed",
-  },
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
 
-  scrollContent: {
-    flexGrow: 1,
-    padding: 20,
-    justifyContent: "center",
-  },
+    scrollContent: {
+      flexGrow: 1,
+      padding: 20,
+      justifyContent: "center",
+    },
 
-  header: {
-    alignItems: "center",
-    marginBottom: 25,
-  },
+    header: {
+      alignItems: "center",
+      marginBottom: 25,
+    },
 
-  logo: {
-    fontSize: 45,
-    marginBottom: 5,
-  },
+    logo: {
+      fontSize: 45,
+      marginBottom: 5,
+    },
 
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#f97316",
-  },
+    title: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.primary,
+    },
 
-  subtitle: {
-    fontSize: 15,
-    color: "#666",
-    marginTop: 5,
-  },
+    subtitle: {
+      fontSize: 15,
+      color: colors.secondaryText,
+      marginTop: 5,
+    },
 
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 18,
-    padding: 20,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      elevation: 4,
+      shadowColor: colors.text,
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+    },
 
-  modeContainer: {
-    flexDirection: "row",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 20,
-  },
+    modeContainer: {
+      flexDirection: "row",
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      padding: 4,
+      marginBottom: 20,
+    },
 
-  modeButton: {
-    flex: 1,
-    paddingVertical: 11,
-    alignItems: "center",
-    borderRadius: 8,
-  },
+    modeButton: {
+      flex: 1,
+      paddingVertical: 11,
+      alignItems: "center",
+      borderRadius: 8,
+    },
 
-  activeMode: {
-    backgroundColor: "#f97316",
-  },
+    activeMode: {
+      backgroundColor: colors.primary,
+    },
 
-  modeText: {
-    fontWeight: "600",
-    color: "#555",
-  },
+    modeText: {
+      fontWeight: "600",
+      color: colors.secondaryText,
+    },
 
-  activeModeText: {
-    color: "#fff",
-  },
+    activeModeText: {
+      color: colors.card,
+    },
 
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 7,
-    marginTop: 10,
-  },
+    label: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.text,
+      marginBottom: 7,
+      marginTop: 10,
+    },
 
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    backgroundColor: "#fafafa",
-  },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.background,
+    },
 
-  errorInput: {
-    borderColor: "#ef4444",
-  },
+    errorInput: {
+      borderColor: colors.error,
+    },
 
-  errorText: {
-    color: "#ef4444",
-    fontSize: 12,
-    marginTop: 4,
-  },
+    errorText: {
+      color: colors.error,
+      fontSize: 12,
+      marginTop: 4,
+    },
 
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    backgroundColor: "#fafafa",
-  },
+    passwordContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+    },
 
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
+    passwordInput: {
+      flex: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+    },
 
-  showText: {
-    color: "#f97316",
-    fontWeight: "600",
-    marginRight: 12,
-  },
+    showText: {
+      color: colors.primary,
+      fontWeight: "600",
+      marginRight: 12,
+    },
 
-  roleContainer: {
-    flexDirection: "row",
-    gap: 10,
-  },
+    roleContainer: {
+      flexDirection: "row",
+      gap: 10,
+    },
 
-  roleButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
+    roleButton: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: "center",
+    },
 
-  selectedRole: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#f97316",
-  },
+    selectedRole: {
+      backgroundColor: colors.background,
+      borderColor: colors.primary,
+    },
 
-  roleText: {
-    color: "#555",
-    fontWeight: "600",
-  },
+    roleText: {
+      color: colors.secondaryText,
+      fontWeight: "600",
+    },
 
-  selectedRoleText: {
-    color: "#f97316",
-  },
+    selectedRoleText: {
+      color: colors.primary,
+    },
 
-  submitButton: {
-    backgroundColor: "#f97316",
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 25,
-  },
+    submitButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginTop: 25,
+    },
 
-  disabledButton: {
-    opacity: 0.7,
-  },
+    disabledButton: {
+      opacity: 0.7,
+    },
 
-  submitText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+    submitText: {
+      color: colors.card,
+      fontSize: 16,
+      fontWeight: "bold",
+    },
 
-  demoTitle: {
-    textAlign: "center",
-    marginTop: 22,
-    marginBottom: 6,
-    fontWeight: "bold",
-    color: "#333",
-  },
+    demoTitle: {
+      textAlign: "center",
+      marginTop: 22,
+      marginBottom: 6,
+      fontWeight: "bold",
+      color: colors.text,
+    },
 
-  demoText: {
-    textAlign: "center",
-    fontSize: 12,
-    color: "#777",
-    marginTop: 2,
-  },
-});
+    demoText: {
+      textAlign: "center",
+      fontSize: 12,
+      color: colors.secondaryText,
+      marginTop: 2,
+    },
+  });

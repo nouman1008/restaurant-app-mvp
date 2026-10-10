@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -8,32 +9,32 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
 
 export default function CheckoutScreen() {
   const { items, promoCode, discountPercent, clearCart } = useCart();
-
   const { addOrder } = useOrders();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-
   const [orderType, setOrderType] = useState<"Dine-in" | "Takeaway">(
     "Takeaway",
   );
-
   const [tableNumber, setTableNumber] = useState("");
   const [pickupTime, setPickupTime] = useState("");
 
   const subtotal = useMemo(() => {
     return items.reduce(
-      (sum, item) => sum + Number(item.price) * item.quantity,
+      (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
       0,
     );
   }, [items]);
+
+  const discount = useMemo(() => {
+    return subtotal * (Number(discountPercent || 0) / 100);
+  }, [subtotal, discountPercent]);
 
   const serviceCharge = useMemo(() => {
     return subtotal * 0.05;
@@ -43,19 +44,15 @@ export default function CheckoutScreen() {
     return subtotal * 0.15;
   }, [subtotal]);
 
-  const discount = useMemo(() => {
-    return subtotal * (discountPercent / 100);
-  }, [subtotal, discountPercent]);
-
   const total = useMemo(() => {
     return subtotal + serviceCharge + tax - discount;
   }, [subtotal, serviceCharge, tax, discount]);
 
   const totalItems = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.quantity, 0);
+    return items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   }, [items]);
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (items.length === 0) {
       Alert.alert(
         "Empty Cart",
@@ -74,6 +71,11 @@ export default function CheckoutScreen() {
       return;
     }
 
+    if (!address.trim()) {
+      Alert.alert("Missing Information", "Please enter your address.");
+      return;
+    }
+
     if (orderType === "Dine-in" && !tableNumber.trim()) {
       Alert.alert("Table Required", "Please enter your table number.");
       return;
@@ -84,17 +86,22 @@ export default function CheckoutScreen() {
       return;
     }
 
-    const orderId = addOrder({
+    const orderId = await addOrder({
       items: items.map((item) => ({
         id: item.id,
         name: item.name,
-        price: item.price,
-        quantity: item.quantity,
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 0),
         note: item.note,
       })),
       total,
       type: orderType,
-      ...(orderType === "Dine-in" ? { tableNumber } : { pickupTime }),
+      customerName: name.trim(),
+      phone: phone.trim(),
+      address: address.trim(),
+      ...(orderType === "Dine-in"
+        ? { tableNumber: tableNumber.trim() }
+        : { pickupTime: pickupTime.trim() }),
     });
 
     clearCart();
@@ -108,7 +115,11 @@ export default function CheckoutScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>Checkout</Text>
 
       <Text style={styles.subtitle}>
@@ -178,26 +189,22 @@ export default function CheckoutScreen() {
       </View>
 
       {orderType === "Dine-in" && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Table Number"
-            keyboardType="number-pad"
-            value={tableNumber}
-            onChangeText={setTableNumber}
-          />
-        </>
+        <TextInput
+          style={styles.input}
+          placeholder="Table Number"
+          keyboardType="number-pad"
+          value={tableNumber}
+          onChangeText={setTableNumber}
+        />
       )}
 
       {orderType === "Takeaway" && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Pickup Time (e.g. 6:30 PM)"
-            value={pickupTime}
-            onChangeText={setPickupTime}
-          />
-        </>
+        <TextInput
+          style={styles.input}
+          placeholder="Pickup Time (e.g. 6:30 PM)"
+          value={pickupTime}
+          onChangeText={setPickupTime}
+        />
       )}
 
       <Text style={styles.sectionTitle}>Order Summary</Text>
@@ -209,7 +216,8 @@ export default function CheckoutScreen() {
           </Text>
 
           <Text style={styles.itemPrice}>
-            Rs. {(Number(item.price) * item.quantity).toFixed(0)}
+            Rs.{" "}
+            {(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(0)}
           </Text>
         </View>
       ))}
@@ -249,7 +257,7 @@ export default function CheckoutScreen() {
       <TouchableOpacity style={styles.placeButton} onPress={placeOrder}>
         <Text style={styles.placeButtonText}>Place Order</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -257,7 +265,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F7F7F7",
+  },
+
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
 
   title: {
@@ -294,6 +306,7 @@ const styles = StyleSheet.create({
   typeRow: {
     flexDirection: "row",
     gap: 10,
+    marginBottom: 5,
   },
 
   typeButton: {
@@ -350,7 +363,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
-    color: "#555",
   },
 
   promoText: {

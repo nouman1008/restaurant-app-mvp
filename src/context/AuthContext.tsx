@@ -4,13 +4,13 @@ type User = {
   id: string;
   fullName: string;
   email: string;
-  password: string;
   role: "customer" | "manager";
 };
 
 type AuthContextType = {
   user: User | null;
-  login: (user: User) => void;
+  token: string | null;
+  login: (user: User, token: string) => void;
   logout: () => void;
 };
 
@@ -18,19 +18,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  const login = (userData: User) => {
+  const login = (userData: User, jwtToken: string) => {
     setUser(userData);
+    setToken(jwtToken);
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token,
         login,
         logout,
       }}

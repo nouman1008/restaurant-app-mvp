@@ -1,16 +1,8 @@
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-
+import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
-  RefreshControl,
+  Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,579 +10,428 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { router } from "expo-router";
-
 import { useCart } from "../context/CartContext";
-import { useMenu, MenuItem } from "../context/MenuContext";
+import { useMenu } from "../context/MenuContext";
+import { useTheme } from "../context/ThemeContext";
 
-const categories = [
-  "All",
-  "Starters",
-  "Mains",
-  "Burgers",
-  "Pizza",
-  "Pakistani",
-  "Fast Food",
-  "Drinks",
-  "Desserts",
-];
+export default function MenuScreen() {
+  const { menuItems } = useMenu();
+  const { items: cartItems } = useCart();
+  const { colors } = useTheme();
 
-type MenuItemCardProps = {
-  item: MenuItem;
-  isFavorite: boolean;
-  onPress: (item: MenuItem) => void;
-  onFavorite: (id: string) => void;
-  onAdd: (item: MenuItem) => void;
-};
+  const items = menuItems ?? [];
 
-const MenuItemCard = memo(function MenuItemCard({
-  item,
-  isFavorite,
-  onPress,
-  onFavorite,
-  onAdd,
-}: MenuItemCardProps) {
-  const unavailable = !item.isAvailable;
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortBy, setSortBy] = useState("Default");
+
+  const cartCount = useMemo(() => {
+    return (cartItems ?? []).reduce(
+      (total: number, item: any) => total + Number(item.quantity || 0),
+      0,
+    );
+  }, [cartItems]);
+
+  const categories = useMemo(() => {
+    const uniqueCategories = Array.from(
+      new Set(
+        items
+          .map((item: any) => item.category)
+          .filter((category: any) => category),
+      ),
+    );
+
+    return ["All", ...uniqueCategories];
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const searchText = search.trim().toLowerCase();
+
+    const filtered = items.filter((item: any) => {
+      const matchesSearch =
+        !searchText ||
+        item.name?.toLowerCase().includes(searchText) ||
+        item.description?.toLowerCase().includes(searchText);
+
+      const matchesCategory =
+        selectedCategory === "All" || item.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+
+    const sorted = [...filtered];
+
+    if (sortBy === "Price: Low to High") {
+      sorted.sort(
+        (a: any, b: any) => Number(a.price || 0) - Number(b.price || 0),
+      );
+    }
+
+    if (sortBy === "Price: High to Low") {
+      sorted.sort(
+        (a: any, b: any) => Number(b.price || 0) - Number(a.price || 0),
+      );
+    }
+
+    if (sortBy === "Name: A to Z") {
+      sorted.sort((a: any, b: any) =>
+        String(a.name || "").localeCompare(String(b.name || "")),
+      );
+    }
+
+    if (sortBy === "Name: Z to A") {
+      sorted.sort((a: any, b: any) =>
+        String(b.name || "").localeCompare(String(a.name || "")),
+      );
+    }
+
+    if (sortBy === "Special First") {
+      sorted.sort(
+        (a: any, b: any) =>
+          Number(b.isSpecial === true) - Number(a.isSpecial === true),
+      );
+    }
+
+    return sorted;
+  }, [items, search, selectedCategory, sortBy]);
+
+  const sortOptions = [
+    "Default",
+    "Price: Low to High",
+    "Price: High to Low",
+    "Name: A to Z",
+    "Name: Z to A",
+    "Special First",
+  ];
 
   return (
-    <View style={[styles.foodCard, unavailable && styles.unavailableCard]}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={styles.foodMain}
-        disabled={unavailable}
-        onPress={() => onPress(item)}
-      >
-        <View style={styles.foodImage}>
-          <Text style={styles.foodEmoji}>{item.image}</Text>
-        </View>
-
-        <View style={styles.foodInfo}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.foodName, unavailable && styles.disabledText]}>
-              {item.name}
-            </Text>
-
-            {item.isSpecial && !unavailable && (
-              <View style={styles.specialBadge}>
-                <Text style={styles.specialText}>SPECIAL</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.category, unavailable && styles.disabledText]}>
-            {item.category}
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            Our Menu
           </Text>
 
           <Text
-            style={[styles.description, unavailable && styles.disabledText]}
-            numberOfLines={2}
+            style={[
+              styles.subtitle,
+              {
+                color: colors.secondaryText,
+              },
+            ]}
           >
-            {item.description}
+            Choose your favorite food
           </Text>
-
-          <Text style={[styles.price, unavailable && styles.disabledText]}>
-            Rs. {item.price}
-          </Text>
-
-          {unavailable && (
-            <Text style={styles.unavailableLabel}>Currently Unavailable</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      {!unavailable && (
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.favoriteButton}
-            onPress={() => onFavorite(item.id)}
-          >
-            <Text style={styles.favoriteText}>{isFavorite ? "❤️" : "♡"}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => onAdd(item)}
-          >
-            <Text style={styles.addButtonText}>+ Add</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-});
-
-export default function MenuScreen() {
-  const { addToCart } = useCart();
-  const { menuItems } = useMenu();
-
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortOption, setSortOption] = useState("default");
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [refreshing, setRefreshing] = useState(false);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-
-  const searchInputRef = useRef<TextInput>(null);
-  const listRef = useRef<FlatList>(null);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previousSearchRef = useRef("");
-
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-
-  /*
-   * Q4:
-   * Simulate fetching menu data using a Promise.
-   * The mock request takes 1.5 seconds.
-   */
-  const loadMenu = useCallback(() => {
-    setIsLoading(true);
-    setError("");
-
-    const timer = setTimeout(() => {
-      Promise.resolve(menuItems)
-        .then(() => {
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setError("Unable to load menu. Please try again.");
-          setIsLoading(false);
-        });
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [menuItems]);
-
-  useEffect(() => {
-    const cleanup = loadMenu();
-
-    return cleanup;
-  }, [loadMenu]);
-
-  /*
-   * Q5:
-   * Manual debounce using useRef.
-   * Search is processed after 400ms.
-   */
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      const value = search.trim();
-
-      setDebouncedSearch(value);
-
-      /*
-       * previousSearchRef prevents duplicate consecutive searches.
-       */
-      if (
-        value.length > 0 &&
-        value.toLowerCase() !== previousSearchRef.current.toLowerCase()
-      ) {
-        setRecentSearches((previous) => {
-          const updated = [
-            value,
-            ...previous.filter(
-              (item) => item.toLowerCase() !== value.toLowerCase(),
-            ),
-          ];
-
-          return updated.slice(0, 5);
-        });
-
-        previousSearchRef.current = value;
-      }
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [search]);
-
-  /*
-   * Q8:
-   * Derived data is calculated with useMemo.
-   * We do not store filteredItems in state.
-   */
-  const filteredItems = useMemo(() => {
-    const searchText = debouncedSearch.toLowerCase();
-
-    let result = menuItems.filter((item) => {
-      const categoryMatch =
-        selectedCategory === "All" || item.category === selectedCategory;
-
-      const searchMatch =
-        searchText === "" ||
-        item.name.toLowerCase().includes(searchText) ||
-        item.category.toLowerCase().includes(searchText);
-
-      return categoryMatch && searchMatch;
-    });
-
-    if (sortOption === "low-high") {
-      result = [...result].sort((a, b) => a.price - b.price);
-    }
-
-    if (sortOption === "high-low") {
-      result = [...result].sort((a, b) => b.price - a.price);
-    }
-
-    if (sortOption === "name") {
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    return result;
-  }, [menuItems, selectedCategory, debouncedSearch, sortOption]);
-
-  /*
-   * Pull-to-refresh.
-   */
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    setError("");
-
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 600);
-  }, []);
-
-  const handleScroll = useCallback((event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-
-    setShowBackToTop(offsetY > 300);
-  }, []);
-
-  const scrollToTop = useCallback(() => {
-    listRef.current?.scrollToOffset({
-      animated: true,
-      offset: 0,
-    });
-  }, []);
-
-  const focusSearch = useCallback(() => {
-    searchInputRef.current?.focus();
-  }, []);
-
-  const clearSearch = useCallback(() => {
-    setSearch("");
-
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 50);
-  }, []);
-
-  const selectRecentSearch = useCallback((value: string) => {
-    setSearch(value);
-
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 50);
-  }, []);
-
-  const openFoodDetails = useCallback((item: MenuItem) => {
-    router.push({
-      pathname: "/food-details",
-      params: {
-        name: item.name,
-        price: String(item.price),
-        emoji: item.image,
-        category: item.category,
-      },
-    });
-  }, []);
-
-  const toggleFavorite = useCallback((id: string) => {
-    setFavorites((previous) => {
-      if (previous.includes(id)) {
-        return previous.filter((itemId) => itemId !== id);
-      }
-
-      return [...previous, id];
-    });
-  }, []);
-
-  const handleAddToCart = useCallback(
-    (item: MenuItem) => {
-      addToCart({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        emoji: item.image,
-        category: item.category,
-      });
-    },
-    [addToCart],
-  );
-
-  const renderItem = useCallback(
-    ({ item }: { item: MenuItem }) => (
-      <MenuItemCard
-        item={item}
-        isFavorite={favorites.includes(item.id)}
-        onPress={openFoodDetails}
-        onFavorite={toggleFavorite}
-        onAdd={handleAddToCart}
-      />
-    ),
-    [favorites, openFoodDetails, toggleFavorite, handleAddToCart],
-  );
-
-  /*
-   * Q4 error state + Retry button.
-   */
-  if (error) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorIcon}>!</Text>
-
-        <Text style={styles.errorTitle}>Menu Loading Failed</Text>
-
-        <Text style={styles.errorText}>{error}</Text>
-
-        <TouchableOpacity style={styles.retryButton} onPress={loadMenu}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#E85D04" />
-
-        <Text style={styles.loadingText}>Loading menu...</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Our Menu</Text>
-
-          <Text style={styles.count}>{filteredItems.length} items</Text>
         </View>
 
         <TouchableOpacity
           style={styles.cartButton}
           onPress={() => router.push("/cart")}
+          activeOpacity={0.8}
         >
           <Text style={styles.cartIcon}>🛒</Text>
+
+          {cartCount > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>{cartCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TouchableOpacity onPress={focusSearch} style={styles.searchIconButton}>
-          <Text style={styles.searchIcon}>🔍</Text>
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.searchContainer,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={styles.searchIcon}>🔍</Text>
 
         <TextInput
-          ref={searchInputRef}
-          style={styles.searchInput}
-          placeholder="Search food..."
-          placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
-          returnKeyType="search"
+          placeholder="Search food..."
+          placeholderTextColor={colors.secondaryText}
+          style={[
+            styles.searchInput,
+            {
+              color: colors.text,
+            },
+          ]}
         />
-
-        {search.length > 0 && (
-          <TouchableOpacity onPress={clearSearch}>
-            <Text style={styles.clearText}>✕</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      {recentSearches.length > 0 && search.length === 0 && (
-        <View style={styles.recentContainer}>
-          <Text style={styles.recentTitle}>Recent searches</Text>
+      <View style={styles.sectionHeader}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            {
+              color: colors.text,
+            },
+          ]}
+        >
+          Categories
+        </Text>
+      </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {recentSearches.map((item, index) => (
-              <TouchableOpacity
-                key={`${item}-${index}`}
-                style={styles.recentChip}
-                onPress={() => selectRecentSearch(item)}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryList}
+      >
+        {categories.map((category: any) => {
+          const active = selectedCategory === category;
+
+          return (
+            <Pressable
+              key={String(category)}
+              onPress={() => setSelectedCategory(String(category))}
+              style={[
+                styles.categoryButton,
+                {
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  {
+                    color: active ? "#FFFFFF" : colors.text,
+                  },
+                ]}
               >
-                <Text style={styles.recentText}>🔍 {item}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+                {category}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
-      <View style={styles.categoryWrapper}>
+      <View style={styles.sortRow}>
+        <Text
+          style={[
+            styles.resultText,
+            {
+              color: colors.secondaryText,
+            },
+          ]}
+        >
+          {filteredItems.length} food item
+          {filteredItems.length !== 1 ? "s" : ""}
+        </Text>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryList}
+          contentContainerStyle={styles.sortList}
         >
-          {categories.map((category) => {
-            const selected = selectedCategory === category;
+          {sortOptions.map((option) => {
+            const active = sortBy === option;
 
             return (
-              <TouchableOpacity
-                key={category}
+              <Pressable
+                key={option}
+                onPress={() => setSortBy(option)}
                 style={[
-                  styles.categoryButton,
-                  selected && styles.selectedCategory,
+                  styles.sortButton,
+                  {
+                    backgroundColor: active ? colors.primary : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
                 ]}
-                onPress={() => setSelectedCategory(category)}
               >
                 <Text
                   style={[
-                    styles.categoryButtonText,
-                    selected && styles.selectedCategoryText,
+                    styles.sortText,
+                    {
+                      color: active ? "#FFFFFF" : colors.text,
+                    },
                   ]}
                 >
-                  {category}
+                  {option}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </ScrollView>
       </View>
 
-      <View style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Sort:</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity
-            style={[
-              styles.sortButton,
-              sortOption === "default" && styles.selectedSort,
-            ]}
-            onPress={() => setSortOption("default")}
-          >
-            <Text
-              style={[
-                styles.sortText,
-                sortOption === "default" && styles.selectedSortText,
-              ]}
-            >
-              Default
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.sortButton,
-              sortOption === "low-high" && styles.selectedSort,
-            ]}
-            onPress={() => setSortOption("low-high")}
-          >
-            <Text
-              style={[
-                styles.sortText,
-                sortOption === "low-high" && styles.selectedSortText,
-              ]}
-            >
-              Price ↑
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.sortButton,
-              sortOption === "high-low" && styles.selectedSort,
-            ]}
-            onPress={() => setSortOption("high-low")}
-          >
-            <Text
-              style={[
-                styles.sortText,
-                sortOption === "high-low" && styles.selectedSortText,
-              ]}
-            >
-              Price ↓
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.sortButton,
-              sortOption === "name" && styles.selectedSort,
-            ]}
-            onPress={() => setSortOption("name")}
-          >
-            <Text
-              style={[
-                styles.sortText,
-                sortOption === "name" && styles.selectedSortText,
-              ]}
-            >
-              A-Z
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-      <Text style={styles.debugText}>Render count: {renderCount.current}</Text>
-
       <FlatList
-        ref={listRef}
         data={filteredItems}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={["#E85D04"]}
-          />
+        keyExtractor={(item: any, index) =>
+          String(item.id || item._id || index)
         }
+        renderItem={({ item }) => <MenuItemCard item={item} colors={colors} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.menuList,
+          filteredItems.length === 0 && styles.emptyList,
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🍽️</Text>
+            <Text style={styles.emptyEmoji}>🍽️</Text>
 
-            <Text style={styles.emptyTitle}>No food found</Text>
-
-            <Text style={styles.emptyText}>
-              Try another food name or category.
+            <Text
+              style={[
+                styles.emptyTitle,
+                {
+                  color: colors.text,
+                },
+              ]}
+            >
+              No food found
             </Text>
 
-            {search.length > 0 && (
-              <TouchableOpacity
-                style={styles.clearSearchButton}
-                onPress={clearSearch}
-              >
-                <Text style={styles.clearSearchButtonText}>Clear Search</Text>
-              </TouchableOpacity>
-            )}
+            <Text
+              style={[
+                styles.emptyText,
+                {
+                  color: colors.secondaryText,
+                },
+              ]}
+            >
+              Try another search or category.
+            </Text>
           </View>
         }
       />
 
-      {showBackToTop && (
-        <TouchableOpacity style={styles.backToTopButton} onPress={scrollToTop}>
-          <Text style={styles.backToTopText}>↑ Top</Text>
+      {cartCount > 0 && (
+        <TouchableOpacity
+          style={[
+            styles.viewCartButton,
+            {
+              backgroundColor: colors.primary,
+            },
+          ]}
+          onPress={() => router.push("/cart")}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.viewCartText}>View Cart ({cartCount})</Text>
         </TouchableOpacity>
       )}
+    </View>
+  );
+}
 
-      <TouchableOpacity
-        style={styles.viewCartButton}
-        onPress={() => router.push("/cart")}
-      >
-        <Text style={styles.viewCartText}>🛒 View Cart</Text>
-      </TouchableOpacity>
+function MenuItemCard({ item, colors }: { item: any; colors: any }) {
+  const { addToCart } = useCart();
+
+  const handleAdd = () => {
+    addToCart(item);
+  };
+
+  const imageUri =
+    item.name === "Chicken Biryani"
+      ? "https://images.unsplash.com/photo-1589302168068-964664d93dc0"
+      : item.image;
+
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.foodImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.placeholderImage}>
+          <Text style={styles.placeholderEmoji}>{item.emoji || "🍽️"}</Text>
+        </View>
+      )}
+
+      <View style={styles.cardContent}>
+        <View style={styles.nameRow}>
+          <Text
+            style={[
+              styles.foodName,
+              {
+                color: colors.text,
+              },
+            ]}
+          >
+            {item.name}
+          </Text>
+
+          {item.isSpecial && (
+            <View style={styles.specialBadge}>
+              <Text style={styles.specialBadgeText}>SPECIAL</Text>
+            </View>
+          )}
+        </View>
+
+        {item.description ? (
+          <Text
+            style={[
+              styles.description,
+              {
+                color: colors.secondaryText,
+              },
+            ]}
+            numberOfLines={2}
+          >
+            {item.description}
+          </Text>
+        ) : null}
+
+        <View style={styles.bottomRow}>
+          <Text
+            style={[
+              styles.price,
+              {
+                color: colors.primary,
+              },
+            ]}
+          >
+            Rs. {Number(item.price || 0).toLocaleString()}
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.addButton,
+              {
+                backgroundColor: colors.primary,
+              },
+              item.isAvailable === false && styles.disabledButton,
+            ]}
+            onPress={handleAdd}
+            disabled={item.isAvailable === false}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addButtonText}>
+              {item.isAvailable === false ? "Unavailable" : "Add to Cart"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -598,426 +439,296 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7F7",
-  },
-
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 30,
-    backgroundColor: "#F7F7F7",
-  },
-
-  loadingText: {
-    marginTop: 10,
-    color: "#777",
-    fontSize: 15,
-  },
-
-  errorIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#FFE5E5",
-    textAlign: "center",
-    textAlignVertical: "center",
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#B00020",
-  },
-
-  errorTitle: {
-    marginTop: 15,
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-  },
-
-  errorText: {
-    marginTop: 8,
-    textAlign: "center",
-    color: "#777",
-  },
-
-  retryButton: {
-    marginTop: 18,
-    backgroundColor: "#E85D04",
-    paddingHorizontal: 28,
-    paddingVertical: 11,
-    borderRadius: 22,
-  },
-
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
+    paddingTop: 20,
   },
 
   header: {
-    backgroundColor: "#E85D04",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 16,
+    marginBottom: 14,
+  },
+
+  headerText: {
+    flex: 1,
   },
 
   title: {
-    color: "#FFFFFF",
-    fontSize: 25,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "800",
   },
 
-  count: {
-    color: "#FFE8D6",
-    fontSize: 13,
-    marginTop: 3,
+  subtitle: {
+    fontSize: 14,
+    marginTop: 4,
   },
 
   cartButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
+    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
   },
 
   cartIcon: {
-    fontSize: 22,
+    fontSize: 25,
+  },
+
+  cartBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#D62828",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+
+  cartBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
   },
 
   searchContainer: {
-    height: 50,
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 15,
-    marginTop: 14,
-    marginBottom: 8,
+    height: 48,
+    marginHorizontal: 16,
+    borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
-  },
-
-  searchIconButton: {
-    padding: 5,
+    paddingHorizontal: 12,
+    marginBottom: 14,
   },
 
   searchIcon: {
     fontSize: 18,
+    marginRight: 8,
   },
 
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#333",
-    paddingHorizontal: 8,
   },
 
-  clearText: {
-    fontSize: 18,
-    color: "#888",
-    padding: 5,
-  },
-
-  recentContainer: {
-    paddingHorizontal: 15,
+  sectionHeader: {
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
 
-  recentTitle: {
-    color: "#555",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginBottom: 6,
-  },
-
-  recentChip: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-    marginRight: 7,
-  },
-
-  recentText: {
-    color: "#666",
-    fontSize: 12,
-  },
-
-  categoryWrapper: {
-    height: 52,
-    marginBottom: 2,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
   },
 
   categoryList: {
-    paddingHorizontal: 15,
-    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
 
   categoryButton: {
+    minWidth: 80,
+    paddingHorizontal: 18,
     height: 40,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 17,
     borderRadius: 20,
+    borderWidth: 1,
     marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
   },
 
-  selectedCategory: {
-    backgroundColor: "#E85D04",
-  },
-
-  categoryButtonText: {
-    color: "#555",
-    fontSize: 13,
+  categoryText: {
+    fontSize: 14,
     fontWeight: "600",
+    textAlign: "center",
   },
 
-  selectedCategoryText: {
-    color: "#FFFFFF",
-  },
-
-  sortContainer: {
+  sortRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
-    marginBottom: 3,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    minHeight: 40,
   },
 
-  sortLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#555",
-    marginRight: 8,
+  resultText: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginRight: 10,
+  },
+
+  sortList: {
+    paddingRight: 16,
   },
 
   sortButton: {
-    backgroundColor: "#FFFFFF",
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 15,
-    marginRight: 6,
-  },
-
-  selectedSort: {
-    backgroundColor: "#333333",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginRight: 7,
   },
 
   sortText: {
-    color: "#555",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
   },
 
-  selectedSortText: {
-    color: "#FFFFFF",
+  menuList: {
+    paddingHorizontal: 16,
+    paddingBottom: 110,
   },
 
-  debugText: {
-    textAlign: "right",
-    paddingHorizontal: 15,
-    color: "#AAAAAA",
-    fontSize: 10,
-    marginBottom: 3,
-  },
-
-  listContent: {
-    paddingTop: 5,
-    paddingBottom: 100,
-  },
-
-  foodCard: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 15,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 15,
-  },
-
-  foodMain: {
-    flexDirection: "row",
-  },
-
-  unavailableCard: {
-    backgroundColor: "#E5E5E5",
-    opacity: 0.65,
+  card: {
+    borderWidth: 1,
+    borderRadius: 16,
+    marginBottom: 14,
+    overflow: "hidden",
   },
 
   foodImage: {
-    width: 78,
-    height: 78,
-    backgroundColor: "#FFF1E8",
-    borderRadius: 14,
+    width: "100%",
+    height: 180,
+  },
+
+  placeholderImage: {
+    width: "100%",
+    height: 180,
+    backgroundColor: "#F2F2F2",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  foodEmoji: {
-    fontSize: 40,
+  placeholderEmoji: {
+    fontSize: 60,
   },
 
-  foodInfo: {
-    flex: 1,
-    marginLeft: 12,
+  cardContent: {
+    padding: 14,
   },
 
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
   },
 
   foodName: {
-    color: "#222",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 19,
+    fontWeight: "700",
+    flex: 1,
   },
 
   specialBadge: {
-    backgroundColor: "#FFF1E8",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginLeft: 7,
+    backgroundColor: "#F4A261",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
 
-  specialText: {
-    color: "#E85D04",
+  specialBadgeText: {
+    color: "#FFFFFF",
     fontSize: 9,
-    fontWeight: "bold",
-  },
-
-  category: {
-    color: "#888",
-    fontSize: 11,
-    marginTop: 3,
+    fontWeight: "800",
   },
 
   description: {
-    color: "#777",
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
   },
 
   price: {
-    color: "#E85D04",
-    fontSize: 15,
-    fontWeight: "bold",
-    marginTop: 5,
-  },
-
-  disabledText: {
-    color: "#777",
-  },
-
-  unavailableLabel: {
-    color: "#A00000",
-    fontSize: 11,
-    fontWeight: "bold",
-    marginTop: 4,
-  },
-
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginTop: 8,
-  },
-
-  favoriteButton: {
-    width: 40,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-
-  favoriteText: {
-    fontSize: 24,
+    fontSize: 17,
+    fontWeight: "800",
   },
 
   addButton: {
-    backgroundColor: "#E85D04",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+
+  disabledButton: {
+    opacity: 0.5,
   },
 
   addButtonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 12,
-  },
-
-  emptyContainer: {
-    alignItems: "center",
-    paddingTop: 60,
-    paddingHorizontal: 30,
-  },
-
-  emptyIcon: {
-    fontSize: 45,
-  },
-
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 10,
-  },
-
-  emptyText: {
-    color: "#777",
-    marginTop: 5,
-    textAlign: "center",
-  },
-
-  clearSearchButton: {
-    marginTop: 15,
-    backgroundColor: "#E85D04",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-
-  clearSearchButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-  },
-
-  backToTopButton: {
-    position: "absolute",
-    right: 18,
-    bottom: 80,
-    backgroundColor: "#333333",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-
-  backToTopText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: "700",
   },
 
   viewCartButton: {
     position: "absolute",
+    left: 16,
+    right: 16,
     bottom: 20,
-    alignSelf: "center",
-    backgroundColor: "#E85D04",
-    paddingVertical: 14,
-    paddingHorizontal: 30,
-    borderRadius: 25,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
   },
 
   viewCartText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  emptyList: {
+    flexGrow: 1,
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
+
+  emptyEmoji: {
+    fontSize: 55,
+    marginBottom: 12,
+  },
+
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  emptyText: {
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: "center",
   },
 });

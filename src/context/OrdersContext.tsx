@@ -2,14 +2,16 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
-  useReducer,
+  useState,
   ReactNode,
 } from "react";
 
-import ordersReducer, { initialState } from "../reducers/ordersReducer";
+import { apiRequest } from "../config/api";
+import { useAuth } from "./AuthContext";
 
-type OrderItem = {
+export type OrderItem = {
   id: string;
   name: string;
   price: number;
@@ -17,7 +19,7 @@ type OrderItem = {
   note?: string;
 };
 
-type Order = {
+export type Order = {
   id: string;
   items: OrderItem[];
   total: number;
@@ -28,70 +30,173 @@ type Order = {
   timestamp: string;
 };
 
+type AddOrderInput = {
+  items: OrderItem[];
+  total: number;
+  type: "Dine-in" | "Takeaway";
+  tableNumber?: string;
+  pickupTime?: string;
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  discount?: number;
+};
+
 type OrdersContextType = {
   orders: Order[];
-  addOrder: (order: Omit<Order, "id" | "status" | "timestamp">) => string;
-  updateStatus: (id: string, status: Order["status"]) => void;
-  cancelOrder: (id: string) => void;
+  addOrder: (order: AddOrderInput) => Promise<string>;
+  updateStatus: (id: string, status: Order["status"]) => Promise<void>;
+  cancelOrder: (id: string) => Promise<void>;
+  refreshOrders: () => Promise<void>;
   clearOrders: () => void;
 };
 
 const OrdersContext = createContext<OrdersContextType | undefined>(undefined);
 
+const formatOrder = (order: any): Order => ({
+  id: String(order._id),
+  items: Array.isArray(order.items)
+    ? order.items.map((item: any) => ({
+        id: String(item.menuItem?._id || item.menuItem),
+        name: String(item.menuItem?.name || "Menu Item"),
+        price: Number(item.price || item.menuItem?.price || 0),
+        quantity: Number(item.quantity || 0),
+      }))
+    : [],
+  total: Number(order.total || 0),
+  type: order.orderType,
+  tableNumber:
+    order.tableNumber !== undefined ? String(order.tableNumber) : undefined,
+  status: order.status,
+  timestamp: order.createdAt || new Date().toISOString(),
+});
+
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(ordersReducer, initialState);
+  const { token } = useAuth();
+
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  const refreshOrders = useCallback(async () => {
+    if (!token) {
+      setOrders([]);
+      return;
+    }
+
+    try {
+      const data = await apiRequest("/orders", {}, token);
+
+      const formattedOrders = Array.isArray(data) ? data.map(formatOrder) : [];
+
+      setOrders(formattedOrders);
+    } catch (error: any) {
+      console.log("Orders fetch error:", error?.message);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    refreshOrders();
+
+    if (!token) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      refreshOrders();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [token, refreshOrders]);
 
   const addOrder = useCallback(
-    (order: Omit<Order, "id" | "status" | "timestamp">) => {
-      const id = `ORD-${Date.now()}`;
+    async (order: AddOrderInput) => {
+      if (!token) {
+        throw new Error("Please login first.");
+      }
 
-      dispatch({
-        type: "ADD_ORDER",
-        payload: {
-          ...order,
-          id,
-          status: "Pending",
-          timestamp: new Date().toISOString(),
+      const notes = order.items
+        .map((item) => item.note?.trim())
+        .filter(Boolean)
+        .join("; ");
+
+      const data = await apiRequest(
+        "/orders",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            items: order.items.map((item) => ({
+              menuItem: item.id,
+              quantity: item.quantity,
+            })),
+            orderType: order.type,
+            ...(order.type === "Dine-in"
+              ? { tableNumber: Number(order.tableNumber) }
+              : {}),
+            notes,
+            discount: Number(order.discount || 0),
+          }),
         },
-      });
+        token,
+      );
 
-      return id;
+      await refreshOrders();
+
+      return String(data.order._id);
     },
-    [],
+    [token, refreshOrders],
   );
 
-  const updateStatus = useCallback((id: string, status: Order["status"]) => {
-    dispatch({
-      type: "UPDATE_STATUS",
-      payload: {
-        id,
-        status,
-      },
-    });
-  }, []);
+  const updateStatus = useCallback(
+    async (id: string, status: Order["status"]) => {
+      if (!token) {
+        throw new Error("Please login first.");
+      }
 
-  const cancelOrder = useCallback((id: string) => {
-    dispatch({
-      type: "CANCEL_ORDER",
-      payload: id,
-    });
-  }, []);
+      if (status === "Cancelled") {
+        await apiRequest(
+          `/orders/${id}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          },
+          token,
+        );
+      } else {
+        await apiRequest(
+          `/orders/${id}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          },
+          token,
+        );
+      }
+
+      await refreshOrders();
+    },
+    [token, refreshOrders],
+  );
+
+  const cancelOrder = useCallback(
+    async (id: string) => {
+      await updateStatus(id, "Cancelled");
+    },
+    [updateStatus],
+  );
 
   const clearOrders = useCallback(() => {
-    dispatch({
-      type: "CLEAR_ORDERS",
-    });
+    setOrders([]);
   }, []);
 
   const value = useMemo(
     () => ({
-      orders: state.orders,
+      orders,
       addOrder,
       updateStatus,
       cancelOrder,
+      refreshOrders,
       clearOrders,
     }),
-    [state.orders, addOrder, updateStatus, cancelOrder, clearOrders],
+    [orders, addOrder, updateStatus, cancelOrder, refreshOrders, clearOrders],
   );
 
   return (

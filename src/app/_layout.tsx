@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Stack, router } from "expo-router";
+import React from "react";
+import { Stack } from "expo-router";
 
 import { CartProvider } from "../context/CartContext";
 import { AuthProvider } from "../context/AuthContext";
@@ -9,14 +9,6 @@ import { ReservationProvider } from "../context/ReservationContext";
 import { MenuProvider } from "../context/MenuContext";
 
 export default function RootLayout() {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace("/login");
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -25,8 +17,6 @@ export default function RootLayout() {
             <ReservationProvider>
               <MenuProvider>
                 <Stack>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-
                   <Stack.Screen name="login" options={{ headerShown: false }} />
 
                   <Stack.Screen

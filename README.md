@@ -62,7 +62,7 @@ Managers can manage orders, reservations, and menu items.
 | Custom Hooks  | Reuse common logic              |
 | `FlatList`    | Display menu lists              |
 
-## 5. Context API
+## ## 5. Context API
 
 The application uses Context API to share data between multiple screens.
 
@@ -75,7 +75,12 @@ Main contexts:
 - `ReservationContext`
 - `MenuContext`
 
-Context helps reduce unnecessary prop drilling.
+Context is suitable for global data because many screens need access to the same state.
+It avoids prop drilling by allowing components to access shared data directly.
+`AuthContext` manages the logged-in user and provides login and logout functions.
+`ThemeContext` manages light and dark themes and allows the theme to change across the whole app.
+This makes shared state easier to manage and maintain in one central place.
+One drawback is that when a Context value changes, all consumers of that Context may re-render.
 
 ## 6. Reducers
 

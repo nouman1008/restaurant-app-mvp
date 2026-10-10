@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
+
 import {
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { useRouter } from "expo-router";
 import { useCart } from "../context/CartContext";
 
@@ -31,20 +34,33 @@ export default function CartScreen() {
   const [promoInput, setPromoInput] = useState("");
 
   const subtotal = useMemo(() => {
-    return items.reduce((total, item) => total + item.price * item.quantity, 0);
+    return items.reduce(
+      (total, item) =>
+        total + Number(item.price || 0) * Number(item.quantity || 0),
+      0,
+    );
   }, [items]);
 
   const discount = useMemo(() => {
-    return (subtotal * discountPercent) / 100;
+    return (subtotal * Number(discountPercent || 0)) / 100;
   }, [subtotal, discountPercent]);
 
-  const deliveryFee = subtotal > 0 ? 0 : 0;
+  const discountedSubtotal = subtotal - discount;
 
-  const total = subtotal - discount + deliveryFee;
+  const serviceCharge = discountedSubtotal * 0.05;
+
+  const tax = discountedSubtotal * 0.15;
+
+  const deliveryFee = 0;
+
+  const total = discountedSubtotal + serviceCharge + tax + deliveryFee;
 
   const handleClearCart = () => {
     Alert.alert("Clear Cart", "Are you sure you want to remove all items?", [
-      { text: "Cancel", style: "cancel" },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
       {
         text: "Clear",
         style: "destructive",
@@ -85,9 +101,11 @@ export default function CartScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Your Cart</Text>
+
           <Text style={styles.subtitle}>
             {items.length} item{items.length !== 1 ? "s" : ""}
           </Text>
@@ -98,15 +116,23 @@ export default function CartScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Cart Items */}
       {items.map((item) => (
         <View key={item.id} style={styles.itemCard}>
           <View style={styles.itemTop}>
-            <Text style={styles.emoji}>{item.emoji}</Text>
+            {/* Food Image */}
+            <Image
+              source={{ uri: item.image }}
+              style={styles.foodImage}
+              resizeMode="cover"
+            />
 
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.name}</Text>
 
-              <Text style={styles.itemPrice}>Rs. {item.price}</Text>
+              <Text style={styles.itemPrice}>
+                Rs. {Number(item.price || 0).toFixed(0)}
+              </Text>
             </View>
 
             <TouchableOpacity onPress={() => remove(item.id)}>
@@ -114,6 +140,7 @@ export default function CartScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Quantity */}
           <View style={styles.quantityRow}>
             <Text style={styles.quantityLabel}>Quantity</Text>
 
@@ -136,10 +163,14 @@ export default function CartScreen() {
             </View>
 
             <Text style={styles.itemTotal}>
-              Rs. {item.price * item.quantity}
+              Rs.{" "}
+              {(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(
+                0,
+              )}
             </Text>
           </View>
 
+          {/* Special Note */}
           <Text style={styles.noteLabel}>Special Note</Text>
 
           <TextInput
@@ -151,6 +182,7 @@ export default function CartScreen() {
         </View>
       ))}
 
+      {/* Promo Code */}
       <View style={styles.promoCard}>
         <Text style={styles.sectionTitle}>Promo Code</Text>
 
@@ -186,17 +218,20 @@ export default function CartScreen() {
         ) : null}
       </View>
 
+      {/* Order Summary */}
       <View style={styles.summaryCard}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
 
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Subtotal</Text>
+
           <Text style={styles.summaryValue}>Rs. {subtotal.toFixed(0)}</Text>
         </View>
 
         {discount > 0 ? (
           <View style={styles.summaryRow}>
             <Text style={styles.discountLabel}>Discount</Text>
+
             <Text style={styles.discountValue}>
               - Rs. {discount.toFixed(0)}
             </Text>
@@ -204,7 +239,20 @@ export default function CartScreen() {
         ) : null}
 
         <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Service Charge (5%)</Text>
+          <Text style={styles.summaryValue}>
+            Rs. {serviceCharge.toFixed(0)}
+          </Text>
+        </View>
+
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Tax (15%)</Text>
+          <Text style={styles.summaryValue}>Rs. {tax.toFixed(0)}</Text>
+        </View>
+
+        <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Delivery</Text>
+
           <Text style={styles.freeText}>FREE</Text>
         </View>
 
@@ -212,10 +260,12 @@ export default function CartScreen() {
 
         <View style={styles.summaryRow}>
           <Text style={styles.totalLabel}>Total</Text>
+
           <Text style={styles.totalValue}>Rs. {total.toFixed(0)}</Text>
         </View>
       </View>
 
+      {/* Checkout */}
       <TouchableOpacity
         style={styles.checkoutButton}
         onPress={() => router.push("/checkout")}
@@ -223,6 +273,7 @@ export default function CartScreen() {
         <Text style={styles.checkoutText}>Proceed to Checkout</Text>
       </TouchableOpacity>
 
+      {/* Continue Shopping */}
       <TouchableOpacity
         style={styles.continueButton}
         onPress={() => router.push("/menu")}
@@ -319,9 +370,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  emoji: {
-    fontSize: 40,
+  foodImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
     marginRight: 12,
+    backgroundColor: "#EEEEEE",
   },
 
   itemInfo: {
