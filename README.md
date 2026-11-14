@@ -219,3 +219,12 @@ RestaurantApp
 The Restaurant App MVP demonstrates the main restaurant workflows using React Native, Expo Router, React Hooks, Context API, reducers, custom hooks, and mock data.
 
 The project can be extended in the future by connecting it to a real backend and database.
+
+
+## A2 Working Demonstration
+
+**Video Duration:** 30 Seconds
+
+**YouTube Video:** [Watch A2 Working Demonstration](https://youtube.com/shorts/AIr_BOfNzTQ)
+
+This video demonstrates the working implementation of Assignment 2.
